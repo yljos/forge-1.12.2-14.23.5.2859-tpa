@@ -57,7 +57,7 @@ class CommandTpa extends CommandBase {
     public String getName() { return "tpa"; }
 
     @Override
-    public String getUsage(ICommandSender sender) { return "/tpa <player>"; }
+    public String getUsage(ICommandSender sender) { return "/tpa <player> OR /tpa <x> <y> <z>"; }
 
     @Override
     public boolean checkPermission(MinecraftServer server, ICommandSender sender) {
@@ -70,23 +70,42 @@ class CommandTpa extends CommandBase {
         if (args.length < 1) throw new WrongUsageException(getUsage(sender));
 
         EntityPlayerMP player = (EntityPlayerMP) sender;
-        EntityPlayerMP target = getPlayer(server, sender, args[0]);
 
-        TpaMod.playTeleportEffects(player); // Source effects
+        if (args.length == 3) {
+            // Parse coordinates and support relative coordinates like ~
+            CommandBase.CoordinateArg xArg = parseCoordinate(player.posX, args[0], true);
+            CommandBase.CoordinateArg yArg = parseCoordinate(player.posY, args[1], false);
+            CommandBase.CoordinateArg zArg = parseCoordinate(player.posZ, args[2], true);
 
-        if (player.dimension != target.dimension) {
-            server.getPlayerList().transferPlayerToDimension(player, target.dimension, new ITeleporter() {
-                @Override
-                public void placeEntity(World world, Entity entity, float yaw) {
-                    entity.setLocationAndAngles(target.posX, target.posY, target.posZ, entity.rotationYaw, entity.rotationPitch);
-                }
-            });
+            TpaMod.playTeleportEffects(player); // Source effects
+
+            // Teleport to the specific coordinates in the current dimension
+            player.connection.setPlayerLocation(xArg.getResult(), yArg.getResult(), zArg.getResult(), player.rotationYaw, player.rotationPitch);
+
+            TpaMod.playTeleportEffects(player); // Destination effects
+            player.sendMessage(new TextComponentString(String.format("Teleported to %.1f, %.1f, %.1f", xArg.getResult(), yArg.getResult(), zArg.getResult())));
+        } else if (args.length == 1) {
+            // Teleport to player
+            EntityPlayerMP target = getPlayer(server, sender, args[0]);
+
+            TpaMod.playTeleportEffects(player); // Source effects
+
+            if (player.dimension != target.dimension) {
+                server.getPlayerList().transferPlayerToDimension(player, target.dimension, new ITeleporter() {
+                    @Override
+                    public void placeEntity(World world, Entity entity, float yaw) {
+                        entity.setLocationAndAngles(target.posX, target.posY, target.posZ, entity.rotationYaw, entity.rotationPitch);
+                    }
+                });
+            } else {
+                player.connection.setPlayerLocation(target.posX, target.posY, target.posZ, player.rotationYaw, player.rotationPitch);
+            }
+
+            TpaMod.playTeleportEffects(player); // Destination effects
+            player.sendMessage(new TextComponentString("Teleported to " + target.getName()));
         } else {
-            player.connection.setPlayerLocation(target.posX, target.posY, target.posZ, player.rotationYaw, player.rotationPitch);
+            throw new WrongUsageException(getUsage(sender));
         }
-
-        TpaMod.playTeleportEffects(player); // Destination effects
-        player.sendMessage(new TextComponentString("Teleported to " + target.getName()));
     }
 
     @Override
@@ -96,6 +115,8 @@ class CommandTpa extends CommandBase {
             players.remove(sender.getName()); // Remove self from autocomplete list
             return getListOfStringsMatchingLastWord(args, players);
         }
+        
+        // Return empty list to prevent coordinate suggestions
         return Collections.emptyList();
     }
 }
