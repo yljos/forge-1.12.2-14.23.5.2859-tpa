@@ -43,6 +43,9 @@ public class TpaMod {
     public static final String NAME = "Tpa Mod";
     public static final String VERSION = "1.0";
 
+    // Feature switch for weekday restriction
+    public static volatile boolean RESTRICT_DAYS_ENABLED = true;
+
     @EventHandler
     public void init(FMLInitializationEvent event) {
         // Register event listener to Forge bus
@@ -54,10 +57,15 @@ public class TpaMod {
         event.registerServerCommand(new CommandTpa());
         event.registerServerCommand(new CommandSetHome());
         event.registerServerCommand(new CommandHome());
+        event.registerServerCommand(new CommandRestrictDays());
     }
 
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!RESTRICT_DAYS_ENABLED) {
+            return;
+        }
+
         if (!(event.player instanceof EntityPlayerMP)) {
             return;
         }
@@ -77,7 +85,7 @@ public class TpaMod {
         DayOfWeek day = LocalDate.now().getDayOfWeek();
         if (day == DayOfWeek.MONDAY || day == DayOfWeek.TUESDAY || day == DayOfWeek.WEDNESDAY || day == DayOfWeek.THURSDAY) {
             // Kick player without adding to banlist
-            player.connection.disconnect(new TextComponentString("Access denied: Joining is prohibited Monday through Thursday."));
+            player.connection.disconnect(new TextComponentString("周一到周四不让玩"));
         }
     }
 
@@ -86,6 +94,52 @@ public class TpaMod {
         WorldServer world = player.getServerWorld();
         world.playSound(null, player.posX, player.posY, player.posZ, SoundEvents.ENTITY_ENDERMEN_TELEPORT, SoundCategory.PLAYERS, 1.0F, 1.0F);
         world.spawnParticle(EnumParticleTypes.PORTAL, player.posX, player.posY + 1.0D, player.posZ, 32, 0.5D, 1.0D, 0.5D, 0.1D);
+    }
+}
+
+class CommandRestrictDays extends CommandBase {
+    @Override
+    public String getName() {
+        return "restrictdays";
+    }
+
+    @Override
+    public String getUsage(ICommandSender sender) {
+        return "/restrictdays <on|off|status>";
+    }
+
+    @Override
+    public int getRequiredPermissionLevel() {
+        return 2; // OP level 2 required
+    }
+
+    @Override
+    public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+        if (args.length < 1) {
+            throw new WrongUsageException(getUsage(sender));
+        }
+
+        String sub = args[0].toLowerCase();
+        if ("on".equals(sub)) {
+            TpaMod.RESTRICT_DAYS_ENABLED = true;
+            sender.sendMessage(new TextComponentString("Weekday join restriction enabled."));
+        } else if ("off".equals(sub)) {
+            TpaMod.RESTRICT_DAYS_ENABLED = false;
+            sender.sendMessage(new TextComponentString("Weekday join restriction disabled."));
+        } else if ("status".equals(sub)) {
+            String state = TpaMod.RESTRICT_DAYS_ENABLED ? "ENABLED" : "DISABLED";
+            sender.sendMessage(new TextComponentString("Weekday join restriction is currently: " + state));
+        } else {
+            throw new WrongUsageException(getUsage(sender));
+        }
+    }
+
+    @Override
+    public List<String> getTabCompletions(MinecraftServer server, ICommandSender sender, String[] args, BlockPos targetPos) {
+        if (args.length == 1) {
+            return getListOfStringsMatchingLastWord(args, "on", "off", "status");
+        }
+        return Collections.emptyList();
     }
 }
 
