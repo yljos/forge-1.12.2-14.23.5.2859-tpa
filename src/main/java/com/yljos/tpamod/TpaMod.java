@@ -85,7 +85,7 @@ public class TpaMod {
         DayOfWeek day = LocalDate.now().getDayOfWeek();
         if (day == DayOfWeek.MONDAY || day == DayOfWeek.TUESDAY || day == DayOfWeek.WEDNESDAY || day == DayOfWeek.THURSDAY) {
             // Kick player without adding to banlist
-            player.connection.disconnect(new TextComponentString("周一到周四不让玩"));
+            player.connection.disconnect(new TextComponentString("Access denied: Joining is prohibited Monday through Thursday"));
         }
     }
 
