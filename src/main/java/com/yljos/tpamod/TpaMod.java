@@ -1,5 +1,6 @@
 package com.yljos.tpamod;
 
+import com.mojang.authlib.GameProfile;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
@@ -10,17 +11,25 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.management.UserListBans;
+import net.minecraft.server.management.UserListBansEntry;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.text.TextComponentString;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.util.ITeleporter;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventHandler;
+import net.minecraftforge.fml.common.event.FMLInitializationEvent;
 import net.minecraftforge.fml.common.event.FMLServerStartingEvent;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.common.gameevent.PlayerEvent;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -38,10 +47,52 @@ public class TpaMod {
     public static final String VERSION = "1.0";
 
     @EventHandler
+    public void init(FMLInitializationEvent event) {
+        // Register event listener to Forge bus
+        MinecraftForge.EVENT_BUS.register(this);
+    }
+
+    @EventHandler
     public void serverStarting(FMLServerStartingEvent event) {
         event.registerServerCommand(new CommandTpa());
         event.registerServerCommand(new CommandSetHome());
         event.registerServerCommand(new CommandHome());
+    }
+
+    @SubscribeEvent
+    public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.player instanceof EntityPlayerMP)) {
+            return;
+        }
+
+        EntityPlayerMP player = (EntityPlayerMP) event.player;
+        MinecraftServer server = player.mcServer;
+        if (server == null) {
+            return;
+        }
+
+        // Bypass check if the player is an operator
+        if (server.getPlayerList().canSendCommands(player.getGameProfile())) {
+            return;
+        }
+
+        // Check if today is Monday to Thursday
+        DayOfWeek day = LocalDate.now().getDayOfWeek();
+        if (day == DayOfWeek.MONDAY || day == DayOfWeek.TUESDAY || day == DayOfWeek.WEDNESDAY || day == DayOfWeek.THURSDAY) {
+            banAndKickPlayer(server, player, "Access denied: Joining is prohibited Monday through Thursday.");
+        }
+    }
+
+    private void banAndKickPlayer(MinecraftServer server, EntityPlayerMP player, String reason) {
+        GameProfile profile = player.getGameProfile();
+        UserListBans banList = server.getPlayerList().getBannedPlayers();
+
+        // Add to server banlist
+        UserListBansEntry entry = new UserListBansEntry(profile, null, "Server", null, reason);
+        banList.addEntry(entry);
+
+        // Disconnect player
+        player.connection.disconnect(new TextComponentString(reason));
     }
 
     // Play teleport effects
@@ -115,7 +166,7 @@ class CommandTpa extends CommandBase {
             players.remove(sender.getName()); // Remove self from autocomplete list
             return getListOfStringsMatchingLastWord(args, players);
         }
-        
+
         // Return empty list to prevent coordinate suggestions
         return Collections.emptyList();
     }
