@@ -1,6 +1,5 @@
 package com.yljos.tpamod;
 
-import com.mojang.authlib.GameProfile;
 import net.minecraft.command.CommandBase;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommandSender;
@@ -11,8 +10,6 @@ import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.management.UserListBans;
-import net.minecraft.server.management.UserListBansEntry;
 import net.minecraft.util.EnumParticleTypes;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
@@ -79,20 +76,9 @@ public class TpaMod {
         // Check if today is Monday to Thursday
         DayOfWeek day = LocalDate.now().getDayOfWeek();
         if (day == DayOfWeek.MONDAY || day == DayOfWeek.TUESDAY || day == DayOfWeek.WEDNESDAY || day == DayOfWeek.THURSDAY) {
-            banAndKickPlayer(server, player, "Access denied: Joining is prohibited Monday through Thursday.");
+            // Kick player without adding to banlist
+            player.connection.disconnect(new TextComponentString("Access denied: Joining is prohibited Monday through Thursday."));
         }
-    }
-
-    private void banAndKickPlayer(MinecraftServer server, EntityPlayerMP player, String reason) {
-        GameProfile profile = player.getGameProfile();
-        UserListBans banList = server.getPlayerList().getBannedPlayers();
-
-        // Add to server banlist
-        UserListBansEntry entry = new UserListBansEntry(profile, null, "Server", null, reason);
-        banList.addEntry(entry);
-
-        // Disconnect player
-        player.connection.disconnect(new TextComponentString(reason));
     }
 
     // Play teleport effects
